@@ -4,15 +4,15 @@ let vertexShaderText = `
 precision mediump float;
 
 attribute vec3 vertPosition;
-attribute vec3 vertColor;
-varying vec3 fragColor;
+attribute vec2 vertTextCoord;
+varying vec2 fragTextCoord;
 uniform mat4 mWorld;
 uniform mat4 mView;
 uniform mat4 mProj;
 
 void main()
 {
- fragColor = vertColor;
+ fragTextCoord = vertTextCoord;
  gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);
 }
 `
@@ -20,10 +20,12 @@ void main()
 let fragmentShaderText = `
 precision mediump float;
 
-varying vec3 fragColor;
+varying vec2 fragTextCoord;
+uniform sampler2D sampler;
+
 void main()
 {
- gl_FragColor = vec4(fragColor, 1.0);
+ gl_FragColor = texture2D(sampler, fragTextCoord);
 }
 `
 
@@ -75,44 +77,44 @@ let initDemo = function() {
     //create buffer
     //
 
-    let boxVerticies = 
-    [ //X, Y, Z          R, G, B
-        // Top
-		-1.0, 1.0, -1.0,   0.5, 0.5, 0.5,
-		-1.0, 1.0, 1.0,    0.5, 0.5, 0.5,
-		1.0, 1.0, 1.0,     0.5, 0.5, 0.5,
-		1.0, 1.0, -1.0,    0.5, 0.5, 0.5,
+    var boxVerticies = 
+	[ // X, Y, Z           U, V
+		// Top
+		-1.0, 1.0, -1.0,   0, 0,
+		-1.0, 1.0, 1.0,    0, 1,
+		1.0, 1.0, 1.0,     1, 1,
+		1.0, 1.0, -1.0,    1, 0,
 
 		// Left
-		-1.0, 1.0, 1.0,    0.75, 0.25, 0.5,
-		-1.0, -1.0, 1.0,   0.75, 0.25, 0.5,
-		-1.0, -1.0, -1.0,  0.75, 0.25, 0.5,
-		-1.0, 1.0, -1.0,   0.75, 0.25, 0.5,
+		-1.0, 1.0, 1.0,    0, 0,
+		-1.0, -1.0, 1.0,   1, 0,
+		-1.0, -1.0, -1.0,  1, 1,
+		-1.0, 1.0, -1.0,   0, 1,
 
 		// Right
-		1.0, 1.0, 1.0,    0.25, 0.25, 0.75,
-		1.0, -1.0, 1.0,   0.25, 0.25, 0.75,
-		1.0, -1.0, -1.0,  0.25, 0.25, 0.75,
-		1.0, 1.0, -1.0,   0.25, 0.25, 0.75,
+		1.0, 1.0, 1.0,    1, 1,
+		1.0, -1.0, 1.0,   0, 1,
+		1.0, -1.0, -1.0,  0, 0,
+		1.0, 1.0, -1.0,   1, 0,
 
 		// Front
-		1.0, 1.0, 1.0,    1.0, 0.0, 0.15,
-		1.0, -1.0, 1.0,    1.0, 0.0, 0.15,
-		-1.0, -1.0, 1.0,    1.0, 0.0, 0.15,
-		-1.0, 1.0, 1.0,    1.0, 0.0, 0.15,
+		1.0, 1.0, 1.0,    1, 1,
+		1.0, -1.0, 1.0,    1, 0,
+		-1.0, -1.0, 1.0,    0, 0,
+		-1.0, 1.0, 1.0,    0, 1,
 
 		// Back
-		1.0, 1.0, -1.0,    0.0, 1.0, 0.15,
-		1.0, -1.0, -1.0,    0.0, 1.0, 0.15,
-		-1.0, -1.0, -1.0,    0.0, 1.0, 0.15,
-		-1.0, 1.0, -1.0,    0.0, 1.0, 0.15,
+		1.0, 1.0, -1.0,    0, 0,
+		1.0, -1.0, -1.0,    0, 1,
+		-1.0, -1.0, -1.0,    1, 1,
+		-1.0, 1.0, -1.0,    1, 0,
 
 		// Bottom
-		-1.0, -1.0, -1.0,   0.5, 0.5, 1.0,
-		-1.0, -1.0, 1.0,    0.5, 0.5, 1.0,
-		1.0, -1.0, 1.0,     0.5, 0.5, 1.0,
-		1.0, -1.0, -1.0,    0.5, 0.5, 1.0,
-    ];
+		-1.0, -1.0, -1.0,   1, 1,
+		-1.0, -1.0, 1.0,    1, 0,
+		1.0, -1.0, 1.0,     0, 0,
+		1.0, -1.0, -1.0,    0, 1,
+	];
 
     var boxIndices =
 	[
@@ -150,27 +152,43 @@ let initDemo = function() {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(boxIndices), gl.STATIC_DRAW)
 
     let positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
-    let colorAttribLocation = gl.getAttribLocation(program, 'vertColor');
+    let textCoordAttributeLocation = gl.getAttribLocation(program, 'vertTextCoord');
     gl.vertexAttribPointer(
         positionAttribLocation,
         3,
         gl.FLOAT,
         gl.FALSE,
-        6 * Float32Array.BYTES_PER_ELEMENT,
+        5 * Float32Array.BYTES_PER_ELEMENT,
         0
     );
 
     gl.vertexAttribPointer(
-        colorAttribLocation,
-        3,
+        textCoordAttributeLocation,
+        2,
         gl.FLOAT,
         gl.FALSE,
-        6 * Float32Array.BYTES_PER_ELEMENT,
+        5 * Float32Array.BYTES_PER_ELEMENT,
         3 * Float32Array.BYTES_PER_ELEMENT
     );
 
     gl.enableVertexAttribArray(positionAttribLocation);
-    gl.enableVertexAttribArray(colorAttribLocation);
+    gl.enableVertexAttribArray(textCoordAttributeLocation);
+
+    //
+    // create texture
+    //
+    var boxTexture = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D, boxTexture);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texImage2D(
+		gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
+		gl.UNSIGNED_BYTE,
+		document.getElementById('crate-image')
+	);
+	gl.bindTexture(gl.TEXTURE_2D, null);
 
     gl.useProgram(program);
 
@@ -200,18 +218,22 @@ let initDemo = function() {
     glMatrix.mat4.identity(identityMatrix);
     let angle = 0;
 
-    let loop = function() {
-        angle = performance.now() / 1000 / 6 * 2 * Math.PI;
-        glMatrix.mat4.rotate(yRotationMatrix, identityMatrix, angle, [0, 1, 0]);
-        glMatrix.mat4.rotate(xRotationMatrix, identityMatrix, angle / 4, [1, 0, 0]);
-        glMatrix.mat4.mul(worldMatrix, yRotationMatrix, xRotationMatrix);
-        gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
+    var loop = function () {
+		angle = performance.now() / 1000 / 6 * 2 * Math.PI;
+		glMatrix.mat4.rotate(yRotationMatrix, identityMatrix, angle, [0, 1, 0]);
+		glMatrix.mat4.rotate(xRotationMatrix, identityMatrix, angle / 4, [1, 0, 0]);
+		glMatrix.mat4.mul(worldMatrix, yRotationMatrix, xRotationMatrix);
+		gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
 
-        gl.clearColor(0.75, 0.85, 0.8, 1.0);
-        gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
-        gl.drawElements(gl.TRIANGLES, boxIndices.length, gl.UNSIGNED_SHORT, 0);
+		gl.clearColor(0.75, 0.85, 0.8, 1.0);
+		gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
 
-        requestAnimationFrame(loop);
-    };
+		gl.bindTexture(gl.TEXTURE_2D, boxTexture);
+		gl.activeTexture(gl.TEXTURE0);
+
+		gl.drawElements(gl.TRIANGLES, boxIndices.length, gl.UNSIGNED_SHORT, 0);
+
+		requestAnimationFrame(loop);
+	};
     requestAnimationFrame(loop);
 };
